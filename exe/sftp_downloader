@@ -1,0 +1,83 @@
+#!/usr/bin/env ruby
+
+require "sftp_downloader"
+require 'optparse'
+require 'logger'
+
+default_logger = Logger.new(STDOUT)
+default_logger.formatter = proc do |severity, datetime, progname, msg|
+  "#{datetime}: #{msg}\n"
+end
+
+options = {
+  credentials: {},
+}
+cli_options = {}
+
+opt_parse = OptionParser.new do |opts|
+  opts.banner = "Usage: sftp_downloader [options]"
+
+  opts.on("-u username", "--username=username", "Specify the username [required]") do |username|
+    options[:credentials][:username] = username
+  end
+
+  opts.on("-p password", "--password=password", "Specify the password [required]") do |password|
+    options[:credentials][:password] = password
+  end
+
+  opts.on("-h host", "--host=host", "Specify the host [required]") do |host|
+    options[:credentials][:host] = host
+  end
+
+  opts.on("-fp file_pattern", "--file-pattern=file_pattern", "Specify the regexp to use to select the files to deal with") do |file_pattern|
+    options[:file_pattern] = Regexp.new(file_pattern)
+  end
+
+  opts.on("-r", "--remove-after-download", "Delete the downloaded files in the remote location") do
+    options[:remove_after_download] = true
+  end
+
+  opts.on("-lp path", "--local-path=path", "Specify the local path to save the files to") do |path|
+    options[:local_path] = path
+  end
+
+  opts.on("-rp path", "--remote-path=path", "Specify the remote path to download the files from") do |path|
+    options[:remote_path] = path
+  end
+
+  opts.on_tail("-h", "--help", "Show this message") do
+    puts opts
+    exit
+  end
+
+  opts.on_tail("--version", "Show version") do
+    puts SftpDownloader::VERSION
+    exit
+  end
+
+  opts.on('-v', '--verbose', 'Run verbosely') do
+    cli_options[:verbose] = true
+  end
+
+  opts.on('-d', '--debug', 'Show debug info') do
+    cli_options[:debug] = true
+    options[:logger] = default_logger
+  end
+end
+
+opt_parse.parse!
+
+required_arguments = %i[host username password]
+required_arguments.each do |argument|
+  if options[:credentials][argument].nil?
+    puts opt_parse
+    exit
+  end
+end
+
+client = SftpDownloader::Client.new(options)
+client.perform do |local_path|
+  if cli_options[:verbose]
+    puts local_path
+  end
+end
